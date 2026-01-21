@@ -208,9 +208,14 @@ WHERE firstname LIKE 'J%';
 -- From the person table, select all the firstname starting with a 'J'
 -- Works very similar to excel find function
 
--- Find J
-
+-- Find J  
+SELECT *
+FROM person.person
+WHERE firstname LIKE '%J%'; # anywhere containing J 
 -- Only works for string!
+SELECT *
+FROM humanresources.employee;
+WHERE birthdate LIKE '1969-01-29%'; -- not supposed to work as data got problem
 
 -- But what if you know the number of letters in the firstname?
 
@@ -221,22 +226,41 @@ WHERE firstname LIKE 'J___';
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- What if we want firstnames that contains the letter a inside?
-
+SELECT *
+FROM person.person
+WHERE firstname LIKE '%A%';
 
 -- not tallying
 
 -- We have two varying results, we can use things like UPPER() and LOWER() clause
+SELECT *
+FROM person.person
+WHERE LOWER(firstname) LIKE '%a%'; 
 
+SELECT *
+FROM person.person
+WHERE UPPER(firstname) LIKE '%A%';
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- WHERE clause: NOT clause
 
 -- From the person table, lastname should not contain A in it.
+SELECT *
+FROM person.person
+WHERE UPPER(lastname) NOT LIKE '%A%'; 
 
 
+-- From the employee table, choose those that do not fall into this date range:
+-- '1977-06-06', '1984-04-30', '1985-05-04'
 
--- From the employee table, choose middle name that contain
+SELECT *
+FROM humanresources.employee
+WHERE birthdate NOT IN (
+	'1977-06-06', 
+	'1984-04-30',
+	'1985-05-04'
+);
 
 
 
@@ -254,47 +278,98 @@ GROUP BY gender;
 
 -- From employee table, group by maritalstatus
 
-
+SELECT 
+	gender
+FROM humanresources.employee
+GROUP BY maritalstatus;
 
 -- We can also group more than one column
-
-
+SELECT
+	gender,
+	maritalstatus,
+	jobtitle
+FROM humanresources.employee
+GROUP BY gender,
+	maritalstatus,
+	jobtitle;
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- All the AGGREGATES!
+SELECT 
+	gender,
+	--COUNT(gender) AS Headcount,
+	--COUNT(*) AS Headcount,
+	COUNT(DISTINCT jobtitle) AS unqiuejobTitle,
+	SUM(vacationhours) AS total_vacation_hours,
+	AVG(vacationhours) AS average_vacation_hours,
+	CEILING(Avg(vacationhours)) AS ceiling_vacation_hours,
+	FLOOR(Avg(vacationhours)) AS floor_vacation_hours,
+	ROUND(Avg(vacationhours)) AS rounded_average,
 
-
+	MAX(sickleavehours) AS max_sick_hours,
+	MIN(sickleavehours) AS min_sick_hours
+	
+FROM humanresources.employee
+GROUP BY gender;
 
 -- Q2: Analyse if the marital status of each gender affects the number of vacation hours one will take
 -- A2:
-
+SELECT 
+	gender,
+	maritalstatus,
+	AVG(vacationhours) AS avg_vacation_hours,
+FROM humanresources.employee
+GROUP BY 1,2;
 
 -- From employee table, ORDER BY hiredate, ASC and DESC
-
 -- hiredate earliest
-
+SELECT *
+FROM humanresources.employee
+ORDER BY hiredate ASC;
 
 -- hiredate latest
-
+SELECT *
+FROM humanresources.employee
+ORDER BY hiredate DESC;
 
 -- Sort table using two or more values
-
+SELECT 
+	jobtitle,
+	gender
+FROM humanresources.employee
+ORDER BY jobtitle ASC, gender ASC;
 
 -- Sorting by Average
-
+SELECT 
+	jobtitle,
+	AVG(vacationhours) AS avg_vacation_hours
+FROM humanresources.employee
+GROUP BY jobtitle
+ORDER BY AVG(vacationhours) DESC;
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- HAVING clause:
-
+SELECT
+	jobtitle,
+	AVG(sickleavehours) AS average_sick_leavehour
+From humanresources.employee
+GROUP BY jobtitle
+HAVING AVG(sickleavehours) >50; --condition
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- Q3: From the customer table, where customer has a personid and a storeid, find the territory that has higher than 40 customers
 -- A3:
-
-
+SELECT
+	territoryid,
+	COUNT(*) AS number_of_customers
+FROM sales.customer
+WHERE personid IS NOT NULL
+	AND storeid IS NOT NULL
+GROUP BY territoryid
+HAVING COUNT(*) > 40;
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -303,11 +378,22 @@ SELECT *
 FROM humanresources.employee
 ORDER BY birthdate ASC;
 
-
+SELECT *
+FROM humanresources.employee
+ORDER BY birthdate ASC
+OFFSET 10; --removing first 10
 
 -- Q4: From the salesperson table, where customer has a personid and a storeid, find the territory that has higher than 40 customers
 -- A4:
-
+SELECT 
+	territoryid,
+	COUNT(*) AS number_of_customers
+FROM sales.customer
+WHERE personid IS NOT NULL
+	AND storeid IS NOT NULL
+GROUP BY territoryid
+HAVING COUNT(*) > 40
+ORDER BY territoryid ASC
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -318,8 +404,12 @@ ORDER BY birthdate ASC;
 	2) Much faster using this compared to generating the entire multi-million row table
 	3) So people don't think you are a noob
 */
-
-
+SELECT *
+FROM humanresources.employee
+WHERE gender = 'M' -->remove female entries
+--WHERE created_date = '2024-10-29' 
+LIMIT 10;
+-- saves money for companies
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -336,7 +426,16 @@ FROM production.productsubcategory;
 SELECT *
 FROM production.productcategory;
 
-
+SELECT
+	product.productid,
+	product.name AS product_name,
+	productcategory.name AS categoryname,
+	productsubcategory.name AS subcategoryname
+FROM production.product AS product -- data after 'from' is the left table 
+INNER JOIN production.productsubcategory AS productsubcategory -- right table
+		ON product.productsubcategoryid = productsubcategory.productsubcategoryid
+INNER JOIN production.productcategory AS productcategory 
+		on productsubcategory.productcategoryid = productcategory.productcategoryid;
 
 -- Let's create a base table in the humanresources schema, where we are able to get each employee's department history and department name
 
@@ -365,7 +464,18 @@ FROM humanresources.department;
 
 -- Let's find all the employee, their respecitve departments and the time they served there. Bonus if you can find out the duration in days each employee spent
 -- in each department! Duration in days cannot be NULL.
-
+SELECT 
+	employee.businessentityid AS employeeid,
+	department.name AS departmentname,
+	employeedepartmenthistory.startdate AS startdate,
+	employeedepartmenthistory.enddate AS enddate,
+	EXTRACT(DAY FROM (employeedepartmenthistory.enddate - employeedepartmenthistory.startdate)) AS durationindays
+FROM humanresources.employee AS employee
+INNER JOIN humanresources.employeedepartmenthistory AS employeedepartmenthistory
+	ON employee.businessentityid = employeedepartmenthistory.businessentityid
+INNER JOIN humanresources.department AS department
+	ON employeedepartmenthistory.departmentid = department.departmentid
+WHERE employeedepartmenthistory.enddate IS NOT NULL;	
 
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -381,11 +491,34 @@ FROM production.product;
 SELECT *
 FROM sales.salesorderdetail;
 
-
+SELECT 
+	product.productid AS productid,
+	product.name AS productname,
+	COALESCE(SUM(salesorderdetail.orderqty), 0) AS totalsalesquantity
+FROM production.product
+LEFT JOIN sales.salesorderdetail
+	ON product.productid = salesorderdetail.productid
+GROUP BY product.productid,
+	product.name
+ORDER BY totalsalesquantity DESC;
 
 -- Q5: List all employees and their associated email addresses,  
 -- display their full name and email address.
+-- A5:	
+SELECT *
+FROM humanresources.employee;	
 
+SELECT *
+FROM person.person;
+
+SELECT 
+	employee.businessentityid AS employeeid,
+	CONCAT(person.firstname, ' ', person.lastname) AS fullname,
+	person.emailaddress AS emailaddress
+FROM humanresources.employee AS employee
+LEFT JOIN person.person AS person
+	ON employee.businessentityid = person.businessentityid
+ORDER BY employeeid ASC;
 
 -- Retrieve a list of all individual customers id, firstname along with the total number of orders they have placed 
 -- and the total amount they have spent, removing customers who have never placed an order. 
@@ -399,24 +532,39 @@ FROM sales.customer;
 SELECT *
 FROM sales.salesorderheader;
 
-
+SELECT 
+	customer.customerid AS customerid,
+	person.firstname AS firstname,
+	COUNT(salesorderheader.salesorderid) AS totalorders,
+	SUM(salesorderheader.totaldue) AS totalamountspent
+FROM sales.customer AS customer
+LEFT JOIN person.person AS person
+	ON customer.personid = person.businessentityid
+LEFT JOIN sales.salesorderheader
+	ON customer.customerid = salesorderheader.customerid
+GROUP BY 
+	customer.customerid,
+	person.firstname
+HAVING COUNT(salesorderheader.salesorderid) > 0
+ORDER BY customerid ASC;
 
 -- Q6: Can LEFT JOIN cause duplication? How?
 -- A6: 
-
+Yes. When there are multiple matching rows in the right table for a single row in the left table,
+the LEFT JOIN will create a separate row in the result set for each match, leading to duplication of the left table's data.
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
--- JOINS: RIGHT
--- Write a query to retrieve all sales orders and their corresponding customers. If a sales order exists without an associated customer, 
--- include the sales order in the result.
+ JOINS: RIGHT
+Write a query to retrieve all sales orders and their corresponding customers. If a sales order exists without an associated customer, 
+include the sales order in the result.
 
 SELECT 
-    salesorderheader.salesorderid AS salesorderid, 
-    salesorderheader.orderdate AS orderdate, 
-    customer.customerid AS customerid, 
-    customer.personid AS personid
-FROM sales.salesorderheader AS salesorderheader
-
+    salesorderheader.salesorderid, 
+    salesorderheader.orderdate, 
+    customer.customerid, 
+    customer.personid
+FROM sales.salesorderheader 
+RIGHT JOIN sales.customer 
+	ON salesorderheader.customerid = customer.customerid;
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -426,26 +574,36 @@ FROM sales.salesorderheader AS salesorderheader
 -- still include them in the result, and if there are sales orders without an associated employee, include those as well.
 
 SELECT 
-    employee.businessentityid AS employeeid,
+    employee.businessentityid,
     salesorderheader.salesorderid
-FROM humanresources.employee AS employee
+FROM humanresources.employee
+FULL OUTER JOIN sales.salesorderheader
+	ON employee.businessentityid = salesorderheader.salespersonid;
 
 		
 -- Write a query to retrieve a list of all employees and customers, and if either side doesn't have a FirstName, 
+
 -- use the available value from the other side. Use FULL OUTER JOIN and COALESCE.
 
 SELECT 
-
-FROM humanresources.employee AS employee
+	COALESCE(employee.businessentityid, person.businessentityid),
+	COALESCE(employee.firstname, person.firstname),
+	COALESCE(employee.lastname, person.lastname)
+FROM humanresources.employee
+FULL OUTER JOIN person.person
+	ON employee.businessentityid = person.businessentityid
+ORDER BY COALESCE(employee.businessentityid, person.businessentityid);
 
 						 
 -- Write a query to list all employees along with their associated sales orders. Include employees who may not have any sales orders. 
 -- Use the COALESCE function to handle NULL values in the SalesOrderID column.
 
 SELECT
-
-FROM humanresources.employee AS employee
-
+	employee.businessentityid AS employeeid,
+	COALESCE(salesorderheader.salesorderid, 'No Sales Order') AS salesorderid
+FROM sales.salesorderheader AS salesorderheader
+FULL OUTER JOIN humanresources.employee AS employee
+	ON salesorderheader.salespersonid = employee.businessentityid	
 ORDER BY employee.employeeid;
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -461,11 +619,12 @@ ORDER BY employee.employeeid;
 -- Write a query to generate all possible combinations of product categories and product models. Show the category name and the model name.
 
 SELECT 
+productcategory.name AS categoryname,
+productmodel.name AS modelname
+FROM production.productmodel AS productmodel
+CROSS JOIN production.productcategory AS productcategory;
 
-FROM production.productcategory AS productcategory
-
-
--- Each category name is matched to each model name
+-- Each model name is matched to each category name
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
