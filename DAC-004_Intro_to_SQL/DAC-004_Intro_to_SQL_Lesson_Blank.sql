@@ -640,8 +640,19 @@ FROM person.person;
 SELECT *
 FROM sales.customer;
 
-
-
+SELECT 
+	businessentityid,
+	firstname,
+	lastname,
+	'Employee' AS entitytype
+FROM humanresources.employee
+UNION
+SELECT
+	businessentityid,
+	firstname,
+	lastname,
+	'Customer' AS entitytype
+FROM person.person
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- UNION ALL: EVERYTHING
@@ -666,36 +677,47 @@ FROM purchasing.purchaseorderheader;
 
 -- STRING FUNCTION
 -- DATE handling, CONCAT()
+SELECT 
+	UPPER(firstname) AS uppercase_firstname,
+	LOWER(lastname) AS lowercase_lastname,
+	CONCAT(uppercase_firstname, ' ', lowercase_lastname) AS fullname
+FROM sales.salesorderheader;
 
 -- Getting parts of the date out
-
 SELECT 
-
+	EXTRACT(YEAR FROM orderdate) AS order_year,
+	EXTRACT(MONTH FROM orderdate) AS order_month,
+	EXTRACT(DAY FROM orderdate) AS order_day
 FROM sales.salesorderheader;
 
 -- DATETIME manipulations
 
 SELECT
-
+	EXTRACT(YEAR FROM orderdate) AS order_year,
+	EXTRACT(MONTH FROM orderdate) AS order_month,
+	EXTRACT(DAY FROM orderdate) AS order_day
 FROM sales.salesorderheader
 WHERE territoryid = 1
 	AND EXTRACT(YEAR FROM orderdate) = 2011;
 
 -- Use string functions to format employee names and email addresses
 SELECT
-
-FROM person.person AS person
-
+UPPER(firstname) AS uppercase_firstname,
+LOWER(lastname) AS lowercase_lastname,
+CONCAT(uppercase_firstname, ' ', lowercase_lastname) AS fullname,
+CONCAT(LOWER(firstname), '.', LOWER(lastname), '@company.com') AS formatted_email
+FROM person.person AS person;
 
 -- From the following table write a query in  SQL to find the  email addresses of employees and groups them by city. 
 -- Return top ten rows.
 
 SELECT 
 	address.city, 
-
+	firstname,
+	lastname,
+	CONCAT(LOWER(firstname), '.', LOWER(lastname), '@company.com') AS email_address	
 FROM person.businessentityaddress AS businessentityaddress  
-
-GROUP BY 
+GROUP BY city
 LIMIT 10;
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -707,7 +729,11 @@ SELECT
 	productid,
 	name,
 	listprice,
-
+	CASE 
+		WHEN listprice < 100 THEN 'Budget'
+		WHEN listprice BETWEEN 100 AND 500 THEN 'Standard'
+		ELSE 'Premium'
+	END AS price_category
 FROM production.product;
 
 -- Write a query to categorize sales orders based on the total amount (TotalDue). If the total amount is less than 1000, categorize it as "Low", 
@@ -716,7 +742,11 @@ FROM production.product;
 SELECT 
     salesorderheader.salesorderid AS salesorderid, 
     salesorderheader.totaldue AS totaldue,
-
+	CASE 
+		WHEN salesorderheader.totaldue < 1000 THEN 'Low'
+		WHEN salesorderheader.totaldue BETWEEN 1000 AND 5000 THEN 'Medium'
+		ELSE 'High'
+	END AS amount_category
 FROM sales.salesorderheader AS salesorderheader;
 
 -- Q7: Write a query to calculate bonuses for each employee. The bonus is calculated based on both their total sales and their length of employment:
@@ -727,13 +757,36 @@ FROM sales.salesorderheader AS salesorderheader;
 -- If their sales are less than 100,000, they get no bonus.
 
 -- A7:
-
-
+SELECT 
+	employee.businessentityid AS employeeid,
+	salesperson.salesytd AS totalsales,
+	EXTRACT(YEAR FROM AGE(CURRENT_DATE, employee.hiredate)) AS years_of_service,
+	CASE 
+		WHEN salesperson.salesytd > 500000 AND years_of_service > 5 THEN salesperson.salesytd * 0.15
+		WHEN salesperson.salesytd > 500000 AND years_of_service <= 5 THEN salesperson.salesytd * 0.10
+		WHEN salesperson.salesytd BETWEEN 100000 AND 500000 THEN salesperson.salesytd * 0.05
+		ELSE salesytd
+	END AS bonus
+FROM humanresources.employee AS employee
+LEFT JOIN sales.salesperson AS salesperson
+	ON employee.businessentityid = salesperson.businessentityid;
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- If time permits:
 -- Window Functions
--- AGGREGATE
+-- AGGREGATE window functions
+SUM() OVER (PARTITION BY ... ORDER BY ...)
+COUNT() OVER (PARTITION BY ... ORDER BY ...)
+AVG() OVER (PARTITION BY ... ORDER BY ...)
+
+Ranking window functions
+ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)
+RANK() OVER (PARTITION BY ... ORDER BY ...)
+DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)
+
+LAG / LEAD window functions
+LAG(column_name, offset, default_value) OVER (PARTITION BY ... ORDER BY ...)
+LEAD(column_name, offset, default_value) OVER (PARTITION BY ... ORDER BY ...
 
 -- Explanation:
 /*
@@ -744,11 +797,43 @@ Instead, they return a value for every row while using a "window" of rows to per
 
 -- Let’s say we want to calculate the running total of sales for each salesperson, partitioned by their ID (so each salesperson gets their own total), 
 -- and ordered by the order date.
-
+SELECT 
+	salesperson.businessentityid AS salespersonid,
+	salesorderheader.orderdate AS orderdate,
+	salesorderheader.totaldue AS order_total,
+	SUM(salesorderheader.totaldue) OVER (
+		PARTITION BY salesperson.businessentityid
+		ORDER BY salesorderheader.orderdate
+	) AS running_total
+FROM sales.salesperson AS salesperson
+INNER JOIN sales.salesorderheader AS salesorderheader
+	ON salesperson.businessentityid = salesorderheader.salespersonid
+ORDER BY salespersonid, orderdate;
 
 
 -- Retrieving distinct active employee names along with salary statistics per department:
+SELECT
+	person.firstname AS firstname,
+	person.lastname AS lastname,
+	department.name AS departmentname,
+	AVG(salaryhistory.salary) OVER (
+		PARTITION BY department.departmentid
+	) AS avg_department_salary,
+	MAX(salaryhistory.salary) OVER (
+		PARTITION BY department.departmentid
+	) AS max_department_salary,
+	MIN(salaryhistory.salary) OVER (
+		PARTITION BY department.departmentid
+	) AS min_department_salary
+FROM humanresources.employee AS employee
+INNER JOIN person.person AS person
+	ON employee.businessentityid = person.businessentityid
+INNER JOIN humanresources.employeedepartmenthistory AS employeedepartmenthistory
+	ON employee.businessentityid = employeedepartmenthistory.businessentityid
+INNER JOIN humanresources.department AS department
+	ON employeedepartmenthistory.departmentid = department.departmentid
+INNER JOIN humanresources.employeesalaryhistory AS salaryhistory
+	ON employee.businessentityid = salaryhistory.businessentityid
+WHERE employee.status = 'Active';
 
-
-	
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
