@@ -3,15 +3,15 @@
 -- SELECT Clause: everything = *
 
 -- Select department table, the employee table and vendor table. Let's explore the database a little!
-# department table
+-- department table
 SELECT *	
 FROM humanresources.department; 	
 
-# employee table
+-- employee table
 SELECT *
 FROM humanresources.employee;
 
-# vendor table
+-- vendor table
 SELECT *
 FROM purchasing.vendor;
 

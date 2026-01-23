@@ -3,13 +3,13 @@
 -- Remeber to create your schema called myownschema!
 --------------------------------------------------------------------------------------------------------------------------------------------------
 
--- CREATE SCHEMA myownschema;
+CREATE SCHEMA myownschema;
 
 --------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- Run this once!
 CREATE TABLE myownschema.numbers (
-	index INT
+    index INT
 );
 
 INSERT INTO myownschema.numbers (index)

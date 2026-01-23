@@ -17,13 +17,25 @@
 SELECT *
 FROM sales.salesorderheader;
 
-
+SELECT 
+    salespersonid,
+    orderdate,
+    totaldue,
+    SUM(totaldue) OVER (
+        PARTITION BY salespersonid
+        ORDER BY orderdate
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS running_total
+FROM sales.salesorderheader
+ORDER BY salespersonid, orderdate;
 
 -- Retrieving distinct active employee names along with salary statistics per department:
 
 SELECT DISTINCT 
-
-
+    employeepayhistory.businessentityid,
+    employeepayhistory.rate,
+    employeepayhistory.payfrequency,
+    department.name AS departmentname
 FROM humanresources.employeepayhistory AS employeepayhistory
 INNER JOIN humanresources.employeedepartmenthistory AS employeedepartmenthistory
         ON employeepayhistory.businessentityid = employeedepartmenthistory.businessentityid  
@@ -44,9 +56,13 @@ ORDER BY 1;
 -- two salespeople have the same total sales, they should have the same rank, but the next rank should be skipped.
 
 SELECT 
-
-FROM sales.salesorderheader AS salesorderheader
-WHERE salesorderheader.salespersonid IS NOT NULL
+    salesorderheader.salespersonid,
+    ROUND(SUM(salesorderheader.totaldue),2) AS totalsales,
+    RANK() OVER (ORDER BY SUM(salesorderheader.totaldue) DESC) AS salesrank 
+FROM 
+    sales.salesorderheader AS salesorderheader
+WHERE 
+    salesorderheader.salespersonid IS NOT NULL
 GROUP BY salesorderheader.salespersonid
 ORDER BY salesrank
 LIMIT 5;
@@ -58,7 +74,7 @@ SELECT
     product.productid,
     product.name AS productname,
     product.listprice,
-
+    DENSE_RANK() OVER (ORDER BY product.listprice DESC) AS pricerank
 FROM production.product AS product
 ORDER BY pricerank;
 
@@ -74,7 +90,10 @@ SELECT
     customerid, 
     orderdate, 
     totaldue, 
-
+    LAG(totaldue) OVER (
+        PARTITION BY customerid 
+        ORDER BY orderdate
+    ) AS previous_order_totaldue
 FROM sales.salesorderheader
 ORDER BY 
     customerid, 
@@ -87,7 +106,10 @@ SELECT
     salesorderid, 
     customerid, 
     orderdate, 
-
+    LEAD(orderdate) OVER (
+        PARTITION BY customerid 
+        ORDER BY orderdate
+    ) AS next_order_date
 FROM sales.salesorderheader
 ORDER BY 
     customerid,
@@ -98,14 +120,24 @@ ORDER BY
 -- Subqueries
 
 -- Write a query to retrieve the customer ID and total amount of their orders, but only for customers who have placed orders with a total greater than 10,000. 
--- Use a subquery to filter the customers.
-
-
-
+SELECT 
+    customerid, 
+    SUM(totaldue) AS total_orders
+FROM sales.salesorderheader
+GROUP BY customerid
+HAVING SUM(totaldue) > 10000;
 
 -- Q1: Write a query to retrieve products whose prices are above the average price in the database.
 -- A1:
-
+SELECT 
+    productid, 
+    name, 
+    listprice
+FROM production.product
+WHERE listprice > (
+    SELECT AVG(listprice)
+    FROM production.product
+);
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -113,18 +145,48 @@ ORDER BY
 
 -- Question: Write a query to calculate the average order amount for each customer using a CTE.
 
+SELECT 
+    customerid, 
+    AVG(totaldue) AS average_order_amount
+FROM sales.salesorderheader
+GROUP BY customerid;
 
 -- Question: Write a query to find the total quantity sold for each product using a CTE.
 -- sales.salesorderdetail, production.product
 
-
+WITH product_sales AS (
+    SELECT 
+        sod.productid,
+        SUM(sod.orderqty) AS total_quantity_sold
+    FROM sales.salesorderdetail AS sod
+    INNER JOIN production.product AS p
+        ON sod.productid = p.productid
+    GROUP BY sod.productid
+)
+SELECT 
+    productid,
+    total_quantity_sold
+FROM product_sales;
 
 
 -- Q2: Write a query to retrieve the most recent order for each customer, using ROW_NUMBER() and a CTE to assign a unique rank to each order, starting with the most recent.
 -- A2:
-
-
-
+SELECT
+    customerid, 
+    salesorderid, 
+    orderdate
+FROM (
+    SELECT
+        customerid, 
+        salesorderid, 
+        orderdate,
+        ROW_NUMBER() OVER (
+            PARTITION BY customerid 
+            ORDER BY orderdate DESC
+        ) AS order_rank
+    FROM sales.salesorderheader
+) AS ranked_orders
+WHERE order_rank = 1;
 
 -- Q3: What's the difference between CTE and subquery?
 -- A3: 
