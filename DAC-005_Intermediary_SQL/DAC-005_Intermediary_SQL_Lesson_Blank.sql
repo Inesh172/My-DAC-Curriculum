@@ -190,7 +190,8 @@ WHERE order_rank = 1;
 
 -- Q3: What's the difference between CTE and subquery?
 -- A3: 
-
+-- CTEs are defined before the main query and can be referenced multiple times within that query, improving readability and maintainability.
+-- Subqueries are nested within the main query and can only be used once, which can make complex queries harder to read.
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- Temporary Tables
@@ -198,8 +199,34 @@ WHERE order_rank = 1;
 -- Write a query to first calculate the total sales amount for each salesperson and then, using the second CTE, calculate the average sales per salesperson. 
 -- Display the salespersons who have above-average total sales.
 
--- First CTE: Calculate total sales for each salesperson
+-- First CTE: Calculate total and averagesales for each salesperson 
+CREATE TEMPORARY TABLE temp_sales_stats AS
+WITH sales_stats AS (
+    SELECT
+        salespersonid,
+        ROUND(SUM(totaldue), 2) AS total_sales,
+        ROUND(AVG(totaldue), 2) AS avg_sales_per_salesperson
+    FROM sales.salesorderheader
+    WHERE salespersonid IS NOT NULL
+    GROUP BY salespersonid
+),
 
+-- Second CTE: Calculate overall average sales across all salespersons
+overall_avg AS (
+    SELECT
+        AVG(total_sales) AS avg_total_sales
+    FROM sales_stats
+)
+
+-- Final Selection: Salespersons with above-average total sales
+SELECT
+    ss.salespersonid,
+    ss.total_sales,
+    ss.avg_sales_per_salesperson
+FROM sales_stats ss
+CROSS JOIN overall_avg oa
+WHERE ss.total_sales > oa.avg_total_sales
+ORDER BY ss.total_sales DESC;
 
 -- Used when you are handling alot of data and writing a very long and complex SQL script, especially helpful when creating a new table with new metrics to solve
 -- a new problem statement.
@@ -208,6 +235,14 @@ WHERE order_rank = 1;
 
 -- Creating a Database
 
+CREATE DATABASE mydatabase
+    WITH 
+    OWNER = postgres
+    ENCODING = 'UTF8'
+    LC_COLLATE = 'en_US.UTF-8'
+    LC_CTYPE = 'en_US.UTF-8'
+    TABLESPACE = pg_default
+    CONNECTION LIMIT = -1;
 
 -- Rmb to refresh!
 
@@ -217,7 +252,11 @@ WHERE order_rank = 1;
 
 -- Creating a Schema in the new database!
 
+CREATE SCHEMA personal
+    AUTHORIZATION postgres;
+
 -- Change connection using the plug connector at the top
+
 -- Change to mydatabase
 
 
@@ -247,8 +286,6 @@ SELECT * FROM personal.persons;
 
 -- Restoring an entire database
 -- Restore the dvdrental database!
-
-
 -- DROP tables in your schema
 
 DROP TABLE personal.persons;
@@ -262,7 +299,8 @@ CREATE TABLE personal.employees (
     -- Just integer
     -- Cannot be NULL
     -- Cannot be NULL
-    -- Must be unique and cannot be NULL
+-- Must be unique and cannot be NULL
+
     -- Defaults to today's date if not specified
     -- Salary must be greater than 0
 -- 	department_id INT REFERENCES departments(department_id) -- Foreign key referencing 'departments' example
@@ -287,11 +325,16 @@ DROP TABLE personal.employees;
 
 -- Update the salary of an employee
 
+UPDATE personal.employees
+SET salary = 65000.00
+WHERE employee_id = 1;
 
 SELECT * FROM personal.employees;
 
 -- Delete an employee from the table
 
+DELETE FROM personal.employees
+WHERE employee_id = 2;
 
 SELECT * FROM personal.employees;
 
@@ -303,14 +346,32 @@ SELECT * FROM personal.employees;
 -- Basically like python functions
 
 -- Create a stored procedure to give a raise to an employee
+CREATE OR REPLACE PROCEDURE personal.give_raise(
+    p_employee_id INT,
+    p_raise_amount NUMERIC
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE personal.employees
+    SET salary = salary + p_raise_amount
+    WHERE employee_id = p_employee_id;
+
+-- Optional safety check
+    IF NOT FOUND THEN
+        RAISE NOTICE 'Employee % not found', p_employee_id;
+    END IF;
+END;
+$$;
 
 
 -- Call the stored procedure to give an employee a raise
 
-
+CALL personal.give_raise(1, 5000.00);
 SELECT * FROM personal.employees;
 
--- DROP PROCEDURE personal.give_raise(integer,numeric);
+-- Drop the stored procedure when done
+DROP PROCEDURE personal.give_raise(integer,numeric);
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -326,7 +387,9 @@ AS $$
 DECLARE
     annual_salary NUMERIC;
 BEGIN
-
+    SELECT salary * 12 INTO annual_salary
+    FROM personal.employees
+    WHERE employee_id = _employee_id;
     
     RETURN annual_salary;
 END;
@@ -336,8 +399,10 @@ $$;
 SELECT personal.calculate_annual_salary(1);
 
 -- But you can do that using Views as well
-
-
+View: A virtual table based on the result-set of an SQL statement.
+CREATE OR REPLACE VIEW personal.employee_annual_salaries AS 
+SELECT employee_id, salary * 12 AS annual_salary
+FROM personal.employees;
 
 SELECT * FROM personal.employee_annual_salaries;
 
