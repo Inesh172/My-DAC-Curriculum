@@ -437,7 +437,10 @@ END;
 $$;
 
 -- Create a trigger to call the log_salary_change function on salary updates
-
+CREATE TRIGGER salary_update_trigger
+AFTER UPDATE OF salary ON personal.employees
+FOR EACH ROW
+EXECUTE FUNCTION personal.log_salary_change();
 
 -- Update an employee's salary to test the trigger
 UPDATE personal.employees
